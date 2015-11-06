@@ -14,6 +14,8 @@ ld -T app.ld -o file.app file.o libBareMetal.o
 #define COUNT_PROCESS_NUM 16
 #define COUNT_PAGES 16
 //#define COUNT_PAGES 16384
+#define FILE_SIZE 13299136
+#define KMER_LEN 14
 
 void *kmer_gen_process(void *param);
 void *kmer_count_process(void *param);
@@ -25,6 +27,8 @@ const char *letters = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijkl
 unsigned long kmer_gen_processes = GEN_PROCESS_NUM;
 unsigned long kmer_count_processes = COUNT_PROCESS_NUM;
 unsigned long nr_processes = GEN_PROCESS_NUM + COUNT_PROCESS_NUM;
+unsigned long file_buf;
+
 
 struct work_elem {
 	unsigned long index;
@@ -47,26 +51,25 @@ unsigned long local = 0;
 int main(void)
 {
 	unsigned long fd, ret;
-	unsigned long buf;
 	unsigned long table;
 	unsigned long i;
 	unsigned long tval = 0;
 
 	/* hard-coded file size */
-	unsigned long cnt = 13299136;
+	unsigned long cnt = FILE_SIZE;
 
 	/* open the input file */
 	fd = b_file_open("data.txt");
 
 	/* allocate mem for input */
-	ret = b_mem_allocate(&buf, 7);
+	ret = b_mem_allocate(&file_buf, 7);
 	if (ret != 7) {
 		b_output("allocate mem failed\n");
 		return 0;
 	}
 
 	/* read from file */
-	ret = b_file_read(fd, (void*)(buf), cnt);
+	ret = b_file_read(fd, (void*)(file_buf), cnt);
 
 	/* allocate mem for counters */
 	ret = b_mem_allocate(&table, COUNT_PAGES);
@@ -106,7 +109,7 @@ int main(void)
 
 	/* clean up */
 	b_file_close(fd);
-	b_mem_release(&buf, 7);
+	b_mem_release(&file_buf, 7);
 	b_mem_release(&table, COUNT_PAGES);
 
 	for (k = 1; k < nr_processes; k++) {
@@ -153,13 +156,78 @@ void b_output_int_nextline(unsigned long val)
 	b_output("\n");
 }
 
+void b_output_str_nextline(char *str)
+{
+	b_output(str);
+	b_output("\n");
+}
+
+static int is_useful_letter(char ch)
+{
+	if (ch == 'A' || ch == 'G' || ch == 'T' || ch == 'C')
+		return 1;
+
+	return 0;
+}
+
+unsigned long calculate_pid(char ch1, char ch2)
+{
+	unsigned long x, y;
+
+	if (ch1 == 'A') x = 0;
+	if (ch1 == 'T') x = 1;
+	if (ch1 == 'G') x = 2;
+	if (ch1 == 'C') x = 3;
+
+	if (ch2 == 'A') y = 0;
+	if (ch2 == 'T') y = 1;
+	if (ch2 == 'G') y = 2;
+	if (ch2 == 'C') y = 3;
+
+	return x << 2 + y;
+}
+void add_to_work_queue(unsigned long target_pid,  unsigned long index)
+{
+	
+
+
+}
+
+static void kmer_gen(char *line, unsigned long index)
+{
+	unsigned long target_pid;
+
+	b_output_str_nextline(line);
+	
+	while (*(line + KMER_LEN - 1) != '\0') {
+		target_pid = calculate_pid(*line, *(line + 1));	
+		add_to_work_queue(target_pid, index);
+		index++;
+		line++;
+	}
+}
+
 void *kmer_gen_process(void *param)
 {
 	struct thread_attr *arg = (struct thread_attr *)param;
 	unsigned long  pid = arg->pid;
+	unsigned long index = 0;
+	char *str = (char *)file_buf;
 
 	b_output("I am ");
 	b_output_int_nextline(pid);
+
+	//while (index <= FILE_SIZE) {
+	while (index <= 165 * 3) {
+		if (is_useful_letter(str[index]) == 0) {
+			index++;
+			continue;
+		}
+
+		str[index + 150] = '\0';
+		kmer_gen(str + index, index);
+		index = index + 151;
+	}
 }
 
 void *kmer_count_process(void *param)
