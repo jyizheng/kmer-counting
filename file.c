@@ -11,7 +11,7 @@ ld -T app.ld -o file.app file.o libBareMetal.o
 
 #define CPU_NUM 24
 #define GEN_PROCESS_NUM 1
-#define COUNT_PROCESS_NUM 2
+#define COUNT_PROCESS_NUM 16
 #define COUNT_PAGES 16
 //#define COUNT_PAGES 16384
 
@@ -42,6 +42,8 @@ unsigned long k = 0;
 unsigned long lock = 0;
 unsigned long local = 0;
 
+
+/* weird behavior: main should be the first */
 int main(void)
 {
 	unsigned long fd, ret;
