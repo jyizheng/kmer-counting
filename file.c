@@ -21,6 +21,7 @@ void *kmer_gen_process(void *param);
 void *kmer_count_process(void *param);
 char *kmer_itoa(unsigned long value, char *result, int base);
 void b_output_int_nextline(unsigned long val);
+void zero_pages(unsigned long addr, unsigned long nr_pages)
 
 const char *letters = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -78,6 +79,8 @@ int main(void)
 		return 0;
 	}
 
+	zero_pages(table, COUNT_PAGES);
+
 	/* allocate memory for per count process work qeueue */
 	for (k = 1; k < nr_processes; k++) {
 		ret = b_mem_allocate(&threads_attr[k].queue_addr, 1);
@@ -85,6 +88,7 @@ int main(void)
 			b_output("allocate mem failed\n");
 			return 0;
 		}
+		zero_pages(threads_attr[k].queue_addr, 1);
 	}
 
 	/* spawn kmer generation process */
@@ -170,6 +174,8 @@ static int is_useful_letter(char ch)
 	return 0;
 }
 
+/* FIXME: figure out how to handle dot */
+
 unsigned long calculate_pid(char ch1, char ch2)
 {
 	unsigned long x, y;
@@ -184,12 +190,14 @@ unsigned long calculate_pid(char ch1, char ch2)
 	if (ch2 == 'G') y = 2;
 	if (ch2 == 'C') y = 3;
 
-	return x << 2 + y;
+	return (x << 2) + y;
 }
+
+/* FIXME: how to design the ring buffer */
+
 void add_to_work_queue(unsigned long target_pid,  unsigned long index)
 {
-	
-
+	unsigned long work_queue = threads_attr[1 + target_pid];
 
 }
 
@@ -238,3 +246,14 @@ void *kmer_count_process(void *param)
 	b_output("I am ");
 	b_output_int_nextline(pid);
 }
+
+void zero_pages(unsigned long addr, unsigned long nr_pages)
+{
+	unsigned long size = (2 * 1024 * 1024 * nr_pages) / sizeof(unsigned long);
+	;unsigned long *buf = (unsigned long) addr;
+	int i;
+
+	for (i = 0; i < size; i++)
+		buf[i] = 0;
+}
+
